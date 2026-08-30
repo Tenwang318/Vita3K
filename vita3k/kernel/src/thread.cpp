@@ -288,7 +288,7 @@ void ThreadState::run_loop() {
 
             if (do_step || suspend_requested || hit_breakpoint(*cpu)) {
                 suspend_requested = false;
-                if (hit_breakpoint(*cpu) && !do_step && !suspend_requested && kernel.debugger.breakpoints.empty()) {
+                if (hit_breakpoint(*cpu) && !do_step && !suspend_requested && !kernel.debugger.has_breakpoints()) {
                     // The guest executed a BKPT with no debugger attached. Suspending here
                     // would stall the thread forever (nothing would ever resume it), so skip
                     // the instruction and keep running instead.

@@ -58,6 +58,11 @@ struct Debugger {
     void update_watches();
     void deinit();
 
+    bool has_breakpoints() const {
+        const std::lock_guard<std::mutex> lock(mutex);
+        return !breakpoints.empty();
+    }
+
 private:
     std::mutex mutex;
     KernelState &parent;
