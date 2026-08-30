@@ -148,6 +148,9 @@ struct State {
 
     std::atomic<bool> paused{ false };
 
+    // Incremented once per presented frame; monitored by the hang watchdog.
+    std::atomic<uint64_t> debug_frame_counter{ 0 };
+
     // Non-owning pointer to dialog state for native common dialog overlays.
     DialogState *common_dialog = nullptr;
     int sys_date_format = 0;

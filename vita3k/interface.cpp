@@ -21,6 +21,7 @@
 #include "module/load_module.h"
 
 #include <config/state.h>
+#include <cpu/functions.h>
 #include <ctime>
 #include <ctrl/state.h>
 #include <dialog/state.h>
@@ -36,6 +37,10 @@
 #include <packages/vci.h>
 #include <renderer/state.h>
 #include <renderer/texture_cache.h>
+
+#include <chrono>
+#include <mutex>
+#include <thread>
 
 #include <miniz.h>
 #include <pugixml.hpp>
@@ -421,6 +426,55 @@ static void do_patches(MemState &mem, const Patches &patches, const SceKernelMod
     }
 }
 
+// Diagnostic watchdog: if the renderer stops presenting frames for a while,
+// dump the state of all guest threads to locate hangs.
+static void hang_watchdog_worker(EmuEnvState &emuenv) {
+    auto &counter = emuenv.renderer->debug_frame_counter;
+    uint64_t last = counter.load();
+    int stall_checks = 0;
+    constexpr int STALL_CHECKS_TO_DUMP = 7; // 7 * 2s = ~14s without a new frame
+
+    while (!emuenv.hang_watchdog.stop) {
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+        if (emuenv.hang_watchdog.stop)
+            break;
+
+        const uint64_t now = counter.load();
+        if (now != last) {
+            last = now;
+            stall_checks = 0;
+            continue;
+        }
+        ++stall_checks;
+        if (stall_checks < STALL_CHECKS_TO_DUMP)
+            continue;
+        stall_checks = 0;
+
+        LOG_ERROR("HANG WATCHDOG: no new frame presented for ~14s, dumping guest threads");
+
+        decltype(emuenv.kernel.threads) threads_snapshot;
+        {
+            const std::lock_guard<std::mutex> guard(emuenv.kernel.mutex);
+            threads_snapshot = emuenv.kernel.threads;
+        }
+
+        for (const auto &[id, thread] : threads_snapshot) {
+            std::unique_lock<std::mutex> tlock(thread->mutex, std::try_to_lock);
+            if (!tlock.owns_lock()) {
+                LOG_ERROR("HANG DUMP: thread {} ({}) [host mutex busy, skipped]", thread->name, id);
+                continue;
+            }
+            LOG_ERROR("HANG DUMP: thread {} ({}) status={} PC=0x{:X} LR=0x{:X}",
+                thread->name, id, static_cast<int>(thread->status),
+                read_pc(*thread->cpu), read_lr(*thread->cpu));
+            const std::string stack = thread->log_stack_traceback();
+            if (!stack.empty())
+                LOG_ERROR("HANG DUMP stack of {}:\n{}", thread->name, stack);
+        }
+        LOG_ERROR("HANG WATCHDOG: dump complete");
+    }
+}
+
 static ExitCode load_app_impl(SceUID &main_module_id, EmuEnvState &emuenv, const AppLaunchRequest &launch_request) {
     const auto call_import = [&emuenv](CPUState &cpu, uint32_t nid, SceUID thread_id) {
         ::call_import(emuenv, cpu, nid, thread_id);
@@ -629,6 +683,10 @@ ExitCode load_app(int32_t &main_module_id, EmuEnvState &emuenv, const AppLaunchR
     if (emuenv.cfg.gdbstub) {
         emuenv.kernel.debugger.wait_for_debugger = true;
         server_open(emuenv);
+    }
+
+    if (!emuenv.hang_watchdog.worker.joinable()) {
+        emuenv.hang_watchdog.worker = std::thread(hang_watchdog_worker, &emuenv);
     }
 
 #if USE_DISCORD

@@ -28,6 +28,9 @@
 #include <utility>
 #include <vector>
 
+#include <atomic>
+#include <thread>
+
 // forward declare everything used in EmuEnvState
 namespace sfo {
 struct SfoAppInfo;
@@ -219,4 +222,18 @@ public:
     // disable copy
     EmuEnvState(const EmuEnvState &) = delete;
     EmuEnvState &operator=(EmuEnvState const &) = delete;
+
+    // Hang watchdog state. Declared last so it is destroyed first: its destructor
+    // joins the worker while all other members are still alive.
+    struct HangWatchdog {
+        std::atomic<bool> stop{ false };
+        std::thread worker;
+
+        ~HangWatchdog() {
+            stop = true;
+            if (worker.joinable())
+                worker.join();
+        }
+    };
+    HangWatchdog hang_watchdog;
 };
