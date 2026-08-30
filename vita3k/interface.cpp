@@ -432,7 +432,8 @@ static void hang_watchdog_worker(EmuEnvState &emuenv) {
     auto &counter = emuenv.renderer->debug_frame_counter;
     uint64_t last = counter.load();
     int stall_checks = 0;
-    constexpr int STALL_CHECKS_TO_DUMP = 7; // 7 * 2s = ~14s without a new frame
+    bool seen_first_frame = last != 0;
+    constexpr int STALL_CHECKS_TO_DUMP = 30; // 30 * 2s = ~60s without a new guest frame
 
     while (!emuenv.hang_watchdog.stop) {
         std::this_thread::sleep_for(std::chrono::seconds(2));
@@ -443,14 +444,19 @@ static void hang_watchdog_worker(EmuEnvState &emuenv) {
         if (now != last) {
             last = now;
             stall_checks = 0;
+            seen_first_frame = true;
             continue;
         }
+        // Only track stalls after the game has presented at least one frame,
+        // slow-loading titles can legitimately take a long time to reach the first one.
+        if (!seen_first_frame)
+            continue;
         ++stall_checks;
         if (stall_checks < STALL_CHECKS_TO_DUMP)
             continue;
         stall_checks = 0;
 
-        LOG_ERROR("HANG WATCHDOG: no new frame presented for ~14s, dumping guest threads");
+        LOG_ERROR("HANG WATCHDOG: no new guest frame for ~60s, dumping guest threads");
 
         decltype(emuenv.kernel.threads) threads_snapshot;
         {
@@ -464,12 +470,18 @@ static void hang_watchdog_worker(EmuEnvState &emuenv) {
                 LOG_ERROR("HANG DUMP: thread {} ({}) [host mutex busy, skipped]", thread->name, id);
                 continue;
             }
-            LOG_ERROR("HANG DUMP: thread {} ({}) status={} PC=0x{:X} LR=0x{:X}",
+            const Address pc = read_pc(*thread->cpu);
+            const Address sp = read_sp(*thread->cpu);
+            LOG_ERROR("HANG DUMP: thread {} ({}) status={} PC=0x{:X} LR=0x{:X} SP=0x{:X}",
                 thread->name, id, static_cast<int>(thread->status),
-                read_pc(*thread->cpu), read_lr(*thread->cpu));
-            const std::string stack = thread->log_stack_traceback();
-            if (!stack.empty())
-                LOG_ERROR("HANG DUMP stack of {}:\n{}", thread->name, stack);
+                pc, read_lr(*thread->cpu), sp);
+            // Only walk the guest stack for threads that ever executed guest code;
+            // never-started threads have PC/SP == 0 and their low memory is a guard page.
+            if (pc != 0 && sp >= 0x80000000 && sp < 0x88400000) {
+                const std::string stack = thread->log_stack_traceback();
+                if (!stack.empty())
+                    LOG_ERROR("HANG DUMP stack of {}:\n{}", thread->name, stack);
+            }
         }
         LOG_ERROR("HANG WATCHDOG: dump complete");
     }
