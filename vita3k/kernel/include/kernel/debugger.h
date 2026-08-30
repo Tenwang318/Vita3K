@@ -64,7 +64,7 @@ struct Debugger {
     }
 
 private:
-    std::mutex mutex;
+    mutable std::mutex mutex;
     KernelState &parent;
     WatchMemoryAddrs watch_memory_addrs;
     Breakpoints breakpoints;
