@@ -1840,7 +1840,7 @@ EXPORT(int, sceGxmColorSurfaceInit, SceGxmColorSurface *surface, SceGxmColorForm
     Ptr<void> surface_data = data;
     if (!surface_data) {
         const uint32_t bytes_per_pixel = static_cast<uint32_t>(gxm::bits_per_pixel(gxm::get_base_format(colorFormat)) / 8);
-        surface_data = Ptr<void>(alloc(mem, strideInPixels * bytes_per_pixel * height, "ColorSurface-data"));
+        surface_data = Ptr<void>(alloc(emuenv.mem, strideInPixels * bytes_per_pixel * height, "ColorSurface-data"));
     }
 
     if ((strideInPixels < width) || ((surface_data.address() & 3) != 0))
