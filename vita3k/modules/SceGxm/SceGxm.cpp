@@ -1822,7 +1822,10 @@ EXPORT(SceGxmColorSurfaceType, sceGxmColorSurfaceGetType, const SceGxmColorSurfa
 
 EXPORT(int, sceGxmColorSurfaceInit, SceGxmColorSurface *surface, SceGxmColorFormat colorFormat, SceGxmColorSurfaceType surfaceType, SceGxmColorSurfaceScaleMode scaleMode, SceGxmOutputRegisterSize outputRegisterSize, uint32_t width, uint32_t height, uint32_t strideInPixels, Ptr<void> data) {
     TRACY_FUNC(sceGxmColorSurfaceInit, surface, colorFormat, surfaceType, scaleMode, outputRegisterSize, width, height, strideInPixels, data);
-    if (!surface || !data)
+    // Some games (eg. Zero Escape: Zero Time Dilemma) pass data == nullptr and keep
+    // using the surface afterwards; rejecting it leaves the struct uninitialized and
+    // breaks every following call. Accept it like the real hardware appears to.
+    if (!surface)
         return RET_ERROR(SCE_GXM_ERROR_INVALID_POINTER);
 
     if (width == 0 || width > 4096 || height == 0 || height > 4096)
