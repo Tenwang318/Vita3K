@@ -285,8 +285,17 @@ static void render_loop(renderer::State &state, DisplayState &display, GxmState 
             }
         }
 
-        state.render_frame(display, gxm, mem);
-        state.swap_window();
+        // Rendering and presenting can also throw (eg. swapchain/presentation or
+        // Vulkan object creation errors); catch so the render thread survives and
+        // the emulator keeps running.
+        try {
+            state.render_frame(display, gxm, mem);
+            state.swap_window();
+        } catch (const std::exception &e) {
+            LOG_ERROR("Exception in render_frame/swap_window: {}", e.what());
+        } catch (...) {
+            LOG_ERROR("Unknown exception in render_frame/swap_window");
+        }
         state.async_flip_requested.store(false, std::memory_order_relaxed);
 
 #ifdef TRACY_ENABLE
