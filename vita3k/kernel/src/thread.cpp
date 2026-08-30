@@ -27,6 +27,8 @@
 #include <cassert>
 #include <cstring>
 #include <memory>
+#include <mutex>
+#include <set>
 #include <sstream>
 
 void ThreadSignal::wait() {
@@ -290,11 +292,18 @@ void ThreadState::run_loop() {
                     // The guest executed a BKPT with no debugger attached. Suspending here
                     // would stall the thread forever (nothing would ever resume it), so skip
                     // the instruction and keep running instead.
+                    static std::mutex logged_bkpts_mutex;
+                    static std::set<Address> logged_bkpts;
                     const Address bkpt_pc = read_pc(*cpu);
+                    {
+                        const std::lock_guard<std::mutex> lock(logged_bkpts_mutex);
+                        if (logged_bkpts.insert(bkpt_pc).second) {
+                            LOG_ERROR("Guest BKPT executed at 0x{:X} with no debugger attached, skipping it.", bkpt_pc);
+                        }
+                    }
                     const bool thumb = is_thumb_mode(*cpu);
                     const Address next_pc = (bkpt_pc & ~1u) + (thumb ? 2 : 4);
                     write_pc(*cpu, thumb ? (next_pc | 1) : next_pc);
-                    LOG_ERROR("Guest BKPT executed at 0x{:X} with no debugger attached, skipping it.", bkpt_pc);
                 } else {
                     update_status(ThreadStatus::suspend);
                 }
