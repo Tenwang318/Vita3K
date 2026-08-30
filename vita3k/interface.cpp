@@ -686,7 +686,7 @@ ExitCode load_app(int32_t &main_module_id, EmuEnvState &emuenv, const AppLaunchR
     }
 
     if (!emuenv.hang_watchdog.worker.joinable()) {
-        emuenv.hang_watchdog.worker = std::thread(hang_watchdog_worker, &emuenv);
+        emuenv.hang_watchdog.worker = std::thread(hang_watchdog_worker, std::ref(emuenv));
     }
 
 #if USE_DISCORD
