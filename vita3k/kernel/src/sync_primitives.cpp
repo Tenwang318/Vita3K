@@ -23,7 +23,7 @@
 #include <util/lock_and_find.h>
 #include <util/log.h>
 
-static constexpr bool LOG_SYNC_PRIMITIVES = true;
+static constexpr bool LOG_SYNC_PRIMITIVES = false;
 
 // ***********
 // * Helpers *
