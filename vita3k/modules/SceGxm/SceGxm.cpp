@@ -34,6 +34,7 @@
 #include <gxm/state.h>
 #include <gxm/types.h>
 #include <kernel/state.h>
+#include <mem/functions.h>
 #include <mem/state.h>
 
 #include <io/state.h>
@@ -1834,7 +1835,15 @@ EXPORT(int, sceGxmColorSurfaceInit, SceGxmColorSurface *surface, SceGxmColorForm
     if (strideInPixels & 1)
         return RET_ERROR(SCE_GXM_ERROR_INVALID_ALIGNMENT);
 
-    if ((strideInPixels < width) || ((data.address() & 3) != 0))
+    // When the game provides no backing memory, allocate it ourselves so that the
+    // memory-mapped renderer has a real address to draw into.
+    Ptr<void> surface_data = data;
+    if (!surface_data) {
+        const uint32_t bytes_per_pixel = static_cast<uint32_t>(gxm::bits_per_pixel(gxm::get_base_format(colorFormat)) / 8);
+        surface_data = Ptr<void>(alloc(mem, strideInPixels * bytes_per_pixel * height, "ColorSurface-data"));
+    }
+
+    if ((strideInPixels < width) || ((surface_data.address() & 3) != 0))
         return RET_ERROR(SCE_GXM_ERROR_INVALID_VALUE);
 
     // if the surface is swizzled, width and height must be power of 2
@@ -1847,7 +1856,7 @@ EXPORT(int, sceGxmColorSurfaceInit, SceGxmColorSurface *surface, SceGxmColorForm
     surface->width = width;
     surface->height = height;
     surface->strideInPixels = strideInPixels;
-    surface->data = data;
+    surface->data = surface_data;
     surface->colorFormat = colorFormat;
     surface->surfaceType = surfaceType;
     surface->outputRegisterSize = outputRegisterSize;
