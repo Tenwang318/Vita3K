@@ -62,7 +62,10 @@ void VKContext::wait_thread_function(const MemState &mem) {
         if (!wait_request)
             break;
 
-        std::visit(overloaded{
+        // A failing request (eg. a Vulkan object creation error inside a surface
+        // sync) must not take down the wait thread and the whole emulator.
+        try {
+            std::visit(overloaded{
                        [&](FenceWaitRequest &request) {
                            fences.push_back(request.fence);
                        },
@@ -120,7 +123,12 @@ void VKContext::wait_thread_function(const MemState &mem) {
                                delete request.callback;
                            }
                        } },
-            *wait_request);
+                *wait_request);
+        } catch (const std::exception &e) {
+            LOG_ERROR("Exception in Vulkan wait thread request handling: {}", e.what());
+        } catch (...) {
+            LOG_ERROR("Unknown exception in Vulkan wait thread request handling");
+        }
     }
 }
 
