@@ -642,7 +642,6 @@ void get_surface_data(GLState &renderer, GLContext &context, uint32_t *pixels, S
 
 void GLState::render_frame(DisplayState &display, const GxmState &gxm, MemState &mem) {
     should_display = false;
-    debug_frame_counter.fetch_add(1, std::memory_order_relaxed);
 
     DisplayFrameInfo display_frame;
     {

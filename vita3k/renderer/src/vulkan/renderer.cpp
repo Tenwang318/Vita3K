@@ -1086,7 +1086,6 @@ void VKState::cleanup() {
 void VKState::render_frame(DisplayState &display, const GxmState &gxm, MemState &mem) {
     // we are displaying this frame, wait for a new one
     should_display = false;
-    debug_frame_counter.fetch_add(1, std::memory_order_relaxed);
 
     DisplayFrameInfo frame;
     {

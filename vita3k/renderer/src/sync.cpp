@@ -91,6 +91,9 @@ COMMAND(handle_set_screen_filter) {
 
 COMMAND(new_frame) {
     TRACY_FUNC_COMMANDS(new_frame);
+    // Guest-driven frame start; the hang watchdog monitors this counter.
+    debug_frame_counter.fetch_add(1, std::memory_order_relaxed);
+
     DisplayFrameInfo *next_frame = helper.pop<DisplayFrameInfo *>();
     DisplayState *display = helper.pop<DisplayState *>();
 
