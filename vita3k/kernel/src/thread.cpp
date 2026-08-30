@@ -286,7 +286,18 @@ void ThreadState::run_loop() {
 
             if (do_step || suspend_requested || hit_breakpoint(*cpu)) {
                 suspend_requested = false;
-                update_status(ThreadStatus::suspend);
+                if (hit_breakpoint(*cpu) && !do_step && !suspend_requested && kernel.debugger.breakpoints.empty()) {
+                    // The guest executed a BKPT with no debugger attached. Suspending here
+                    // would stall the thread forever (nothing would ever resume it), so skip
+                    // the instruction and keep running instead.
+                    const Address bkpt_pc = read_pc(*cpu);
+                    const bool thumb = is_thumb_mode(*cpu);
+                    const Address next_pc = (bkpt_pc & ~1u) + (thumb ? 2 : 4);
+                    write_pc(*cpu, thumb ? (next_pc | 1) : next_pc);
+                    LOG_ERROR("Guest BKPT executed at 0x{:X} with no debugger attached, skipping it.", bkpt_pc);
+                } else {
+                    update_status(ThreadStatus::suspend);
+                }
             }
 
             // Guest function for this run_loop returned (or errored).
