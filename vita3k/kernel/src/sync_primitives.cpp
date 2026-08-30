@@ -23,7 +23,7 @@
 #include <util/lock_and_find.h>
 #include <util/log.h>
 
-static constexpr bool LOG_SYNC_PRIMITIVES = false;
+static constexpr bool LOG_SYNC_PRIMITIVES = true;
 
 // ***********
 // * Helpers *
@@ -665,6 +665,11 @@ inline static int mutex_lock_impl(KernelState &kernel, MemState &mem, const char
         data.lock_count = lock_count;
         data.priority = thread->priority;
 
+        if (mutex->owner) {
+            LOG_WARN("[DEADLOCK-TRACE] thread {} (id {}) blocking on {} uid {} name \"{}\" owned by thread {} (id {}), lock_count {}, waiting {}",
+                thread->name, thread->id, export_name, mutex->uid, mutex->name,
+                mutex->owner->name, mutex->owner->id, mutex->lock_count, mutex->waiting_threads->size());
+        }
         const auto data_it = mutex->waiting_threads->push(data);
         thread_lock.unlock();
 
@@ -1053,6 +1058,8 @@ SceInt32 semaphore_wait(KernelState &kernel, const char *export_name, SceUID thr
     if (semaphore->val < needCount) {
         std::unique_lock<std::mutex> thread_lock(thread->mutex);
         thread->update_status(ThreadStatus::wait, ThreadStatus::run);
+        LOG_WARN("[DEADLOCK-TRACE] thread {} (id {}) blocking on {} uid {} name \"{}\" val {} need {}",
+            thread->name, thread->id, export_name, semaphore->uid, semaphore->name, semaphore->val, needCount);
 
         WaitingThreadData data;
         data.thread = thread;
@@ -1251,6 +1258,8 @@ int condvar_wait(KernelState &kernel, MemState &mem, const char *export_name, Sc
 
     std::unique_lock<std::mutex> thread_lock(thread->mutex);
     thread->update_status(ThreadStatus::wait, ThreadStatus::run);
+    LOG_WARN("[DEADLOCK-TRACE] thread {} (id {}) blocking on {} uid {} name \"{}\" assoc_mutex uid {}",
+        thread->name, thread->id, export_name, condvar->uid, condvar->name, condvar->associated_mutex->uid);
 
     WaitingThreadData data;
     data.thread = thread;
