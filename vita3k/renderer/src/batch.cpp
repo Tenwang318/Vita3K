@@ -25,6 +25,7 @@
 
 #include <config/state.h>
 #include <display/state.h>
+#include <exception>
 #include <functional>
 #include <overlay/display_manager.h>
 #include <overlay/shader_precompile_progress.h>
@@ -114,7 +115,15 @@ static void process_batch(renderer::State &state, const FeatureState &features, 
             LOG_ERROR("Unimplemented command opcode {}", static_cast<int>(cmd->opcode));
         } else {
             CommandHelper helper(cmd);
-            handler->second(state, mem, config, helper, features, command_list.context);
+            // A failing command (eg. a Vulkan object creation error) must not take
+            // down the render thread and the whole emulator; skip it and keep going.
+            try {
+                handler->second(state, mem, config, helper, features, command_list.context);
+            } catch (const std::exception &e) {
+                LOG_ERROR("Exception in render command handler (opcode {}): {}", static_cast<int>(cmd->opcode), e.what());
+            } catch (...) {
+                LOG_ERROR("Unknown exception in render command handler (opcode {})", static_cast<int>(cmd->opcode));
+            }
         }
 
         Command *last_cmd = cmd;
@@ -249,7 +258,15 @@ static void render_loop(renderer::State &state, DisplayState &display, GxmState 
         if (!state.set_current())
             break;
 
-        process_batches(state, state.features, mem, config, 500);
+        // Last line of defense: an exception escaping the render loop would
+        // terminate the process (std::terminate on this thread).
+        try {
+            process_batches(state, state.features, mem, config, 500);
+        } catch (const std::exception &e) {
+            LOG_ERROR("Exception escaped process_batches: {}", e.what());
+        } catch (...) {
+            LOG_ERROR("Unknown exception escaped process_batches");
+        }
 
         if (state.render_abort.load(std::memory_order_relaxed))
             break;
