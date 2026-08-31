@@ -101,10 +101,11 @@ COMMAND(new_frame) {
     {
         static std::atomic<uint32_t> nf_count{ 0 };
         const uint32_t n = nf_count.fetch_add(1);
-        if (n < 3 || (n % 60) == 0)
+        if (n < 3 || (n % 60) == 0) {
             const Address nf_base = next_frame ? static_cast<Address>(next_frame->base) : 0;
             LOG_WARN("[PRESENT-CHAIN] K: NewFrame #{} next_frame={} base=0x{:X}",
                 n, next_frame != nullptr, nf_base);
+        }
     }
 
     if (next_frame) {
