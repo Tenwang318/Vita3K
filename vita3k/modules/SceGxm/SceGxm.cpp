@@ -5201,7 +5201,7 @@ EXPORT(int, sceGxmTextureSetHeight, SceGxmTexture *texture, uint32_t height) {
     if (!texture)
         return RET_ERROR(SCE_GXM_ERROR_INVALID_POINTER);
     if (height > 4096) {
-        LOG_ERROR("sceGxmTextureSetHeight: height {} > 4096 on texture at {:X}", height, log_hex(Ptr<Address>(texture).address()));
+        LOG_ERROR("sceGxmTextureSetHeight: height {} > 4096 on texture at {:X}", height, log_hex(reinterpret_cast<uintptr_t>(texture)));
         return RET_ERROR(SCE_GXM_ERROR_INVALID_VALUE);
     }
 
@@ -5438,7 +5438,7 @@ EXPORT(int, sceGxmTextureSetWidth, SceGxmTexture *texture, uint32_t width) {
     if (!texture) {
         return RET_ERROR(SCE_GXM_ERROR_INVALID_POINTER);
     } else if (width > 4096) {
-        LOG_ERROR("sceGxmTextureSetWidth: width {} > 4096 on texture at {:X}", width, log_hex(Ptr<Address>(texture).address()));
+        LOG_ERROR("sceGxmTextureSetWidth: width {} > 4096 on texture at {:X}", width, log_hex(reinterpret_cast<uintptr_t>(texture)));
         return RET_ERROR(SCE_GXM_ERROR_INVALID_VALUE);
     }
 
