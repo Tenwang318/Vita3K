@@ -942,7 +942,7 @@ static void display_entry_thread(EmuEnvState &emuenv) {
             const uint32_t n = cb_count.fetch_add(1);
             if (n < 3 || (n % 60) == 0)
                 LOG_WARN("[PRESENT-CHAIN] G: run_guest_function #{} addr=0x{:X} data=0x{:X} ret will follow as H",
-                    n, callback_address, display_callback->data.address());
+                    n, callback_address, display_callback->data);
         }
         display_thread->run_guest_function(callback_address, display_callback->data);
         {
