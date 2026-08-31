@@ -2290,9 +2290,12 @@ EXPORT(int, sceGxmDisplayQueueAddEntry, Ptr<SceGxmSyncObject> oldBuffer, Ptr<Sce
     {
         static std::atomic<uint32_t> add_entry_count{ 0 };
         const uint32_t n = add_entry_count.fetch_add(1);
-        if (n < 3 || (n % 60) == 0)
+        if (n < 3 || (n % 60) == 0) {
+            const uint32_t old_ts = oldBufferSync->last_display.load();
+            const uint32_t new_ts = newBufferSync->last_display.load();
             LOG_WARN("[PRESENT-CHAIN] A: DisplayQueueAddEntry #{} old_ts={} new_ts={} predicted={}",
-                n, oldBufferSync->last_display, newBufferSync->last_display, frame != nullptr);
+                n, old_ts, new_ts, frame != nullptr);
+        }
     }
     emuenv.gxm.display_queue.push(display_callback);
 
