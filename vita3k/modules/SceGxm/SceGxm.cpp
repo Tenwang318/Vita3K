@@ -46,6 +46,8 @@
 #include <util/bytes.h>
 #include <util/log.h>
 
+#include <atomic>
+
 #include <util/tracy.h>
 TRACY_MODULE_NAME(SceGxm);
 
@@ -935,7 +937,20 @@ static void display_entry_thread(EmuEnvState &emuenv) {
         emuenv.display.current_sync_object = display_callback->new_sync.address();
 
         // Now run callback
+        {
+            static std::atomic<uint32_t> cb_count{ 0 };
+            const uint32_t n = cb_count.fetch_add(1);
+            if (n < 3 || (n % 60) == 0)
+                LOG_WARN("[PRESENT-CHAIN] G: run_guest_function #{} addr=0x{:X} data=0x{:X} ret will follow as H",
+                    n, callback_address, display_callback->data.address());
+        }
         display_thread->run_guest_function(callback_address, display_callback->data);
+        {
+            static std::atomic<uint32_t> cb_done_count{ 0 };
+            const uint32_t n = cb_done_count.fetch_add(1);
+            if (n < 3 || (n % 60) == 0)
+                LOG_WARN("[PRESENT-CHAIN] H: run_guest_function #{} returned", n);
+        }
 
         // Notifies the renderer of the completion of the callback for the display_entry.
         // The last_display of the entry, when pushed into the queue, is guaranteed to be timestamp_ahead + 1 at the time of the call.
@@ -2272,6 +2287,13 @@ EXPORT(int, sceGxmDisplayQueueAddEntry, Ptr<SceGxmSyncObject> oldBuffer, Ptr<Sce
     emuenv.gxm.last_display_global = emuenv.gxm.global_timestamp.fetch_add(1, std::memory_order_relaxed);
 
     // function may be blocking here (expected behavior)
+    {
+        static std::atomic<uint32_t> add_entry_count{ 0 };
+        const uint32_t n = add_entry_count.fetch_add(1);
+        if (n < 3 || (n % 60) == 0)
+            LOG_WARN("[PRESENT-CHAIN] A: DisplayQueueAddEntry #{} old_ts={} new_ts={} predicted={}",
+                n, oldBufferSync->last_display, newBufferSync->last_display, frame != nullptr);
+    }
     emuenv.gxm.display_queue.push(display_callback);
 
     // TODO: I do this because the sync function does not have access to the display state, but this is not great

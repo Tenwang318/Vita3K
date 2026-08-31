@@ -26,6 +26,9 @@
 #include <util/lock_and_find.h>
 #include <util/types.h>
 
+#include <atomic>
+#include <mutex>
+
 #include <util/tracy.h>
 TRACY_MODULE_NAME(SceDisplay);
 
@@ -154,6 +157,14 @@ EXPORT(SceInt32, _sceDisplaySetFrameBuf, const SceDisplayFrameBuf *pFrameBuf, Sc
     info.image_size.x = pFrameBuf->width;
     info.image_size.y = pFrameBuf->height;
     update_prediction(emuenv, info);
+
+    {
+        static std::atomic<uint32_t> sfb_count{ 0 };
+        const uint32_t n = sfb_count.fetch_add(1);
+        if (n < 3 || (n % 60) == 0)
+            LOG_WARN("[PRESENT-CHAIN] I: SetFrameBuf #{} base=0x{:X} pitch={} {}x{} fmt=0x{:X}",
+                n, pFrameBuf->base, pFrameBuf->pitch, pFrameBuf->width, pFrameBuf->height, pFrameBuf->pixelformat);
+    }
 
     emuenv.display.last_setframe_vblank_count = emuenv.display.vblank_count.load();
     emuenv.frame_count++;

@@ -15,6 +15,7 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+#include <atomic>
 #include <chrono>
 #include <future>
 #include <renderer/commands.h>
@@ -96,6 +97,14 @@ COMMAND(new_frame) {
 
     DisplayFrameInfo *next_frame = helper.pop<DisplayFrameInfo *>();
     DisplayState *display = helper.pop<DisplayState *>();
+
+    {
+        static std::atomic<uint32_t> nf_count{ 0 };
+        const uint32_t n = nf_count.fetch_add(1);
+        if (n < 3 || (n % 60) == 0)
+            LOG_WARN("[PRESENT-CHAIN] K: NewFrame #{} next_frame={} base={}",
+                n, next_frame != nullptr, next_frame ? next_frame->base : 0);
+    }
 
     if (next_frame) {
         // set the predicted frame as the next one to render
