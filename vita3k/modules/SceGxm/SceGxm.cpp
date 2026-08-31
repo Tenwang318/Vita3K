@@ -5200,8 +5200,10 @@ EXPORT(int, sceGxmTextureSetHeight, SceGxmTexture *texture, uint32_t height) {
     TRACY_FUNC(sceGxmTextureSetHeight, texture, height);
     if (!texture)
         return RET_ERROR(SCE_GXM_ERROR_INVALID_POINTER);
-    if (height > 4096)
+    if (height > 4096) {
+        LOG_ERROR("sceGxmTextureSetHeight: height {} > 4096 on texture at {:X}", height, log_hex(Ptr<Address>(texture).address()));
         return RET_ERROR(SCE_GXM_ERROR_INVALID_VALUE);
+    }
 
     if ((texture->type << 29) == SCE_GXM_TEXTURE_TILED) {
         if (texture->mip_count > 1) {
@@ -5355,7 +5357,14 @@ EXPORT(int, sceGxmTextureSetStride, SceGxmTexture *texture, uint32_t byteStride)
     if ((byteStride < 4) || (byteStride > 131072))
         return RET_ERROR(SCE_GXM_ERROR_INVALID_VALUE);
 
-    return UNIMPLEMENTED();
+    // same stride encoding as sceGxmTextureInitLinearStrided
+    const uint32_t stride_compressed = (byteStride >> 2) - 1;
+    texture->mip_filter = stride_compressed & 1;
+    texture->min_filter = (stride_compressed & 0b0000110) >> 1;
+    texture->mip_count = (stride_compressed & 0b1111000) >> 3;
+    texture->lod_bias = (stride_compressed & 0b1111110000000) >> 7;
+
+    return 0;
 }
 
 static bool verify_texture_mode(SceGxmTexture *texture, SceGxmTextureAddrMode mode) {
@@ -5429,6 +5438,7 @@ EXPORT(int, sceGxmTextureSetWidth, SceGxmTexture *texture, uint32_t width) {
     if (!texture) {
         return RET_ERROR(SCE_GXM_ERROR_INVALID_POINTER);
     } else if (width > 4096) {
+        LOG_ERROR("sceGxmTextureSetWidth: width {} > 4096 on texture at {:X}", width, log_hex(Ptr<Address>(texture).address()));
         return RET_ERROR(SCE_GXM_ERROR_INVALID_VALUE);
     }
 
