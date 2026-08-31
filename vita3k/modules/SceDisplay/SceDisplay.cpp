@@ -163,7 +163,7 @@ EXPORT(SceInt32, _sceDisplaySetFrameBuf, const SceDisplayFrameBuf *pFrameBuf, Sc
         const uint32_t n = sfb_count.fetch_add(1);
         if (n < 3 || (n % 60) == 0)
             LOG_WARN("[PRESENT-CHAIN] I: SetFrameBuf #{} base=0x{:X} pitch={} {}x{} fmt=0x{:X}",
-                n, static_cast<uint32_t>(pFrameBuf->base), pFrameBuf->pitch, pFrameBuf->width, pFrameBuf->height, pFrameBuf->pixelformat);
+                n, pFrameBuf->base.address(), pFrameBuf->pitch, pFrameBuf->width, pFrameBuf->height, pFrameBuf->pixelformat);
     }
 
     emuenv.display.last_setframe_vblank_count = emuenv.display.vblank_count.load();
